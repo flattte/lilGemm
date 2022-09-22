@@ -10,7 +10,7 @@ const size_t ys = 2024;
 [[clang::optnone]]
 void print_gflops(std::chrono::microseconds duration, int m, int p, int n) {
     uint64_t microseconds = duration.count();
-    double gflop = static_cast<double>((m*n * (2*p - 1)))/1000000000.0;
+    double gflop = static_cast<double>((m * n * (2*p - 1))) / 1000000000.0;
     double seconds = static_cast<double>(microseconds / 1000000.0);
     double gflops = gflop / seconds;
     printf("Matmul performed at %lf GFLOPs\n", gflops);
@@ -30,8 +30,8 @@ float incremental(size_t i, size_t j) {
 
 void print(float* mm, size_t x, size_t y, size_t stride=1) {
     printf("[[MAT: m = %lu, n = %lu]], stride=%zu\n", x, y, stride);
-    for(size_t i = 0; i < x; i+=stride) {
-        for(size_t j = 0; j < y; j+=stride) {
+    for(size_t i = 0; i < x; i += stride) {
+        for(size_t j = 0; j < y; j += stride) {
             printf(" %0.3f ", mm[i*x + j]); 
         }
         printf("]");
@@ -48,8 +48,8 @@ void transpose(float* a, float* b, size_t x, size_t y) {
 }
 
 __attribute__((aligned(64))) float mm[xs*ys];
-__attribute__((aligned(64))) float mm_t[xs* ys];
-__attribute__((aligned(64))) float c[xs * ys];
+__attribute__((aligned(64))) float mm_t[xs*ys];
+__attribute__((aligned(64))) float c[xs*ys];
 
 struct matrix { 
     size_t m;
@@ -87,7 +87,7 @@ int main(){
     const size_t stride = 128;
     // //-O3 makes this ridiculously fast
     //__attribute__((aligned(32))) float* mm = (float*)calloc(xs * ys, sizeof(float));
-    size_t matrix_size_bytes = sizeof(float)*xs*ys;
+    size_t matrix_size_bytes = sizeof(float) * xs * ys;
     memset(mm, 0, matrix_size_bytes);
     memset(mm_t, 0, matrix_size_bytes);
     memset(c, 0, matrix_size_bytes);
