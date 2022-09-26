@@ -3,15 +3,16 @@
 #include <string.h>
 #include <chrono>
 #include <memory.h>
+#include <errno.h>
 
-const size_t xs = 2024;
-const size_t ys = 2024;
+const size_t xs = 2048;
+const size_t ys = 2048;
 
 [[clang::optnone]]
 void print_gflops(std::chrono::microseconds duration, int m, int p, int n) {
     uint64_t microseconds = duration.count();
-    double gflop = static_cast<double>((m * n * (2*p - 1))) / 1000000000.0;
-    double seconds = static_cast<double>(microseconds / 1000000.0);
+    double gflop = static_cast<double>(m * n * (2*p - 1)) / 1000000000.0;
+    double seconds = static_cast<double>(microseconds) / 1000000.0;
     double gflops = gflop / seconds;
     printf("Matmul performed at %lf GFLOPs\n", gflops);
 }
@@ -52,8 +53,8 @@ __attribute__((aligned(64))) float mm_t[xs*ys];
 __attribute__((aligned(64))) float c[xs*ys];
 
 struct matrix { 
-    size_t m;
     size_t n;
+    size_t m;
     float* mat;
 };
 typedef struct matrix matrix;
@@ -61,7 +62,6 @@ float*  __attribute__((assume_aligned(64))) get_alligned_matrix(float* m) {
     return m; 
 }
 
-//assumes transposition for now;
 void matmul(matrix a, matrix b, matrix c) { 
     if (a.n != b.m) {
         printf("Matrices cannot be multiplied reason: (m0,n0) . (m1, n1) => n0 != m1");
@@ -71,14 +71,36 @@ void matmul(matrix a, matrix b, matrix c) {
     float* B __attribute__((aligned(64))) = get_alligned_matrix(b.mat);
     float* C __attribute__((aligned(64))) = get_alligned_matrix(c.mat); 
 
-    float acc = 0.0f;
-    for (int i = 0; i < a.m; ++i) {
-        for (int j = 0; j < b.n; ++j) {
-            for (int k = 0; k < a.n; ++k) {
-                acc += A[i*a.m + k] + B[j*b.n + k];
+    for (size_t i = 0; i < a.m; ++i) {
+        for (size_t j = 0; j < b.n; ++j) {
+            for (size_t k = 0; k < a.n; ++k) {
+                C[i*a.m + j] += A[i*a.m + k] + B[j*b.n + k];
             }
-            C[i*a.m + j] = acc;
-            acc = 0.0f;
+        } 
+    }
+}
+
+//assumes transposition for now;
+void block_matmul(matrix a, matrix b, matrix c) { 
+    if (a.n != b.m) {
+        printf("Matrices cannot be multiplied reason: (m0,n0) . (m1, n1) => n0 != m1");
+        return;
+    }
+    const size_t block = 32;
+    float* A __attribute__((aligned(64))) = get_alligned_matrix(a.mat);
+    float* B __attribute__((aligned(64))) = get_alligned_matrix(b.mat);
+    float* C __attribute__((aligned(64))) = get_alligned_matrix(c.mat); 
+    if (a.n % block != 0) {
+        printf("ERROR: Inner block with wrong size: %ld mod %ld != 0 \n", b.n, block);
+        return;
+    }
+    for (size_t i = 0; i < a.m; ++i) {
+        for (size_t j = 0; j < b.n; ++j) {
+            for (size_t k = 0; k < a.n; k+=block) {
+                for (size_t inner_block = 0; inner_block < block; inner_block++) {
+                    C[i*a.m + j] += A[i*a.m + k + inner_block] + B[j*b.n + k + inner_block];
+                }
+            }
         } 
     }
 }
@@ -103,27 +125,14 @@ int main(){
     matrix C = {xs, ys, c};
 
     auto start_time = std::chrono::high_resolution_clock::now();
-    // float acc = 0.0f;
-
-    // for(int i = 0; i < xs; ++i) {
-    //     for(int j = 0; j < ys; ++j) {
-    //         for(int k = 0; k < xs; ++k) {
-    //             acc += mm[i*xs + k] * mm_t[j*xs + k]; 
-    //         }
-    //         c[i*xs + j] = acc;
-    //         acc = 0.0f; 
-    //     }
-    // }
-    
-    matmul(A, B, C);
-
+    block_matmul(A, B, C);
 
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
     printf("Matmul done in %ld microseconds [10^(-6)s]\n", duration.count());
     print_gflops(duration, xs, ys, ys);
     
-    print(C.mat, xs, ys, stride);
+    //print(C.mat, xs, ys, stride);
     return 0;
 }
 
