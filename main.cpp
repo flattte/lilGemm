@@ -8,6 +8,11 @@
 const size_t xs = 2048;
 const size_t ys = 2048;
 
+__attribute__((aligned(64))) float mm[xs*ys];
+__attribute__((aligned(64))) float mm_t[xs*ys];
+__attribute__((aligned(64))) float c[xs*ys];
+
+
 [[clang::optnone]]
 void print_gflops(std::chrono::microseconds duration, int m, int p, int n) {
     uint64_t microseconds = duration.count();
@@ -47,10 +52,6 @@ void transpose(float* a, float* b, size_t x, size_t y) {
         }
     }
 }
-
-__attribute__((aligned(64))) float mm[xs*ys];
-__attribute__((aligned(64))) float mm_t[xs*ys];
-__attribute__((aligned(64))) float c[xs*ys];
 
 struct matrix { 
     size_t n;
